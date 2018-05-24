@@ -21,9 +21,9 @@
 
 (define (proper! x)
   (cond
-   [(proper-list? x) x]
-   [(pair? x) (cons (car x) (proper! (cdr x)))]
-   [else (list x)]))
+   ((proper-list? x) x)
+   ((pair? x) (cons (car x) (proper! (cdr x))))
+   (else (list x))))
 
 (define (args-rest x)
   (and (not (proper-list? x))
