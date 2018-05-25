@@ -210,14 +210,26 @@
     ((_ b1 . bs)
      (orp (andp . b1) (condp . bs)))))
 
-(defparser (rep p n)
+(define-syntax condp>
+  (syntax-rules ()
+    ((_) neverp)
+    ((_ b1 . bs)
+     (orp (->p . b1) (condp . bs)))))
+
+(define (repp n p)
   (cond
-   ((zero? n) idp)
+   ((zero? n) nilp)
    ((positive? n)
-    (consp p (rep p (- n 1))))))
+    (consp p (repp (- n 1) p)))))
+
+(define (rep p min max)
+  (apply orp
+         (map (λ (n) (repp n p))
+              (range max (- min 1)))))
 
 (begin
 
+  ;; basics 
   (testp (constp "42") "42")
 
   (testp nump 'a 1)
@@ -230,24 +242,16 @@
     (mapp (λ _ 'forty-two) forty2p))
   (testp forty2p_ 41 42)
 
-  (testp (andp nump gt10p) 1 10 34 67)
+  (testp (andp nump gt10p)
+         1 10 34 67)
 
   (testp (orp nump (predp string?))
          1 "aze" 'zer)
 
-  (testp (consp forty2p_ gt10p)
-         (cons 42 11) (cons 42 1))
-
   (testp (->p nump forty2p_ (predp symbol?))
          42)
 
-  (testp
-   (condp
-    (nump forty2p_)
-    (nump gt10p)
-    ((predp string?) (constp "42") (λp _ "mtf42!!!")))
-   42 11 2 "23" "42")
-
+  ;; cons.p
   (testp
    (cons.p
     nump
@@ -255,12 +259,14 @@
     (predp pair?))
    '(1 2 3))
 
+  ;; ifp
   (testp
    (ifp nump
         forty2p_
         (->p (predp symbol?) (constp 'foo)))
    'foo 42 'a 1)
 
+  ;; list 
   (testp nilp '())
   (testp (listp) '())
   (testp (listp (predp number?)) '(1))
@@ -270,13 +276,20 @@
    (listp (predp number?) (predp symbol?))
    '(1 foo) '(42 35) '(aze 1) '(qsd dfg))
 
+  ;; condp
+
+  (testp (consp forty2p_ gt10p)
+         (cons 42 11) (cons 42 1))
+
   (testp
    (condp
     (nump forty2p_)
     (nump gt10p)
-    ((predp string?) (constp "42")))
-   42 10 11 "42" 'aze)
+    ((predp string?) (constp "42") (λp _ "mtf42!!!")))
+   42 11 2 "23" "42")
 
+
+  ;; catp
   (testp
    (catp
     (listp nump nump)
@@ -284,9 +297,23 @@
     (listp symp))
    '(1 2 11 12 aze))
 
-  (comment
-   (testp (rep nump 3)
-          '(1 2 'aze 4 5)))
+  ;; rep 
+  (testp (repp 4 nump)
+         '(1 2 3 4))
+
+  (testp
+   (catp
+    (repp 2 nump)
+    (repp 2 symp))
+
+   '(1 2 a b)
+   '(1 a 2 b))
+
+  (testp
+   (rep nump 2 5)
+   '(1 2)
+   '(1 2 3)
+   '(1 2 3 5 6 7))
   )
 
 
