@@ -67,5 +67,22 @@
             (cons (car ys)
                   (interleave (cdr xs) (cdr ys))))))
 
+(define range
+  (case-lambda
+    ((from to)
+     (range from to (if (< from to) 1 -1)))
+    ((from to by)
+     (let ((compare-fn (if (positive? by) < >)))
+       (if (compare-fn from to)
+           (cons from (range (+ from by) to by))
+           '())))))
+
 (begin
-  (interleave '(1 2 3 4 5) '(1 2 3 4)))
+  (interleave '(1 2 3 4 5) '(1 2 3 4))
+
+  (range 10 0)
+  (range 1 10)
+  (range 10 0 -2)
+  (range 0 2 0.1)
+
+  )
