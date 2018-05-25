@@ -1,147 +1,5 @@
-
-;; syntax ------------------------------------------------------------------------
-
-(define-syntax comment
-  (lambda (expr inject compare) `(begin '())))
-
-(define-syntax λ
-  (syntax-rules ()
-    ((_ args . body)
-     (lambda args . body))))
-
-;; utils --------------------------------------------------------------------------
-
-(define (compose f g)
-  (λ args (g (apply f args))))
-
-(define (cdrr x)
-  (if (pair? x)
-      (cdrr (cdr x))
-      x))
-
-(define (proper! x)
-  (cond
-   ((proper-list? x) x)
-   ((pair? x) (cons (car x) (proper! (cdr x))))
-   (else (list x))))
-
-(define (args-rest x)
-  (and (not (proper-list? x))
-       (cdrr x)))
-
-(define (take xs n)
-  (if (or (null? xs)
-          (zero? n))
-      '()
-      (cons (car xs)
-            (take (cdr xs) (- n 1)))))
-
-(define reduce
-  (case-lambda
-    ((f xs)
-     (reduce f (car xs) (cdr xs)))
-    ((f init xs)
-     (or (and (null? xs) init)
-         (reduce f (f init (car xs)) (cdr xs))))))
-
-(define (drop xs n)
-  (if (or (zero? n) (null? xs))
-      xs
-      (drop (cdr xs) (- n 1))))
-
-(define (min-len xs n)
-  (>= (length xs) n))
-
-(define (take! xs n)
-  (and (min-len xs n)
-       (take xs n)))
-
-(define (partition xs n)
-  (if (null? xs) xs
-      (cons (take xs n)
-            (partition (drop xs n) n))))
-
-(define (interleave xs ys)
-  (if (or (null? xs) (null? ys))
-      '()
-      (cons (car xs)
-            (cons (car ys)
-                  (interleave (cdr xs) (cdr ys))))))
-
-(begin
-  (interleave '(1 2 3 4 5) '(1 2 3 4)))
-
-;; alists ------------------------------------------------------------------------
-
-(define (kmentry? x)
-  (and (pair? x)
-       (symbol? (car x))))
-
-(define (km? x)
-  (or (null? x)
-      (and (kmentry? (car x))
-           (km? (cdr x)))))
-
-(define (kmjoin a b)
-  (cond
-   ((null? a) b)
-   ((null? b) a)
-   ((km? b)
-    (let ((fst (car b)))
-      (kmjoin
-       (alist-update (car fst) (cdr fst) a)
-       (cdr b))))))
-
-(define (km . xs)
-  (cond
-   ((null? xs) '())
-   ((symbol? (car xs))
-    (cons (cons (car xs) (cadr xs))
-          (apply km (cddr xs))))
-   ((km? (car xs))
-    (kmjoin (car xs) (apply km (cdr xs))))))
-
-(define (kmget target req)
-  (cond
-
-   ((null? req) target)
-
-   ((symbol? req)
-    (let ((e (assq req target)))
-      (and e (cdr e))))
-
-   ((km? req)
-    (map (λ (x)
-           (cons (car x)
-                 ((cdr x)
-                  (kmget target (car x)))))
-         req))
-
-   ((and (pair? req)
-         (symbol? (car req)))
-    (if (null? (cdr req))
-        (km (car req)
-            (kmget target (car req)))
-        (km (car req)
-            (kmget target (car req))
-            (kmget target (cdr req)))))))
-
-(define (kmget> target . reqs)
-  (reduce kmget target reqs))
-
-(begin
-  (km? (km 'a 1))
-  (km? (km 'a 1 'b 2))
-  (km? (km 'c 5 (km 'a 1 'b 2)))
-  (let ((k (km 'a 1 'b 2 'c 3)))
-   (list
-    (kmget k 'a)
-    (kmget k '())
-    (kmget k (km 'a identity 'b (λ (x) (+ x 1))))
-    (kmget k '(a b))
-    )))
-
-;; parsers ------------------------------------------------------------------------
+(load-relative "utils.scm")
+(load-relative "km.scm")
 
 (define (parser . opts)
   (km 'parser? #t (apply km opts)))
@@ -208,7 +66,7 @@
           (define (,predsym p) (parser-id= p ',id))
           ,(if parametric?
               `(define ,id (parametric-parser ,@(cdr exp)))
-              `(define ,id (parser 'parser-id ',id 'parser-impl ,@(cddr exp)))))))))
+              `(define ,id (km ,(caddr exp) 'parser-id ',id ,@(cdddr exp)))))))))
 
 (comment
  "another way"
@@ -239,10 +97,10 @@
 ;; primitives --------
 
 (defparser idp
-  (λ (x match _) (match x)))
+  (λp (x match _) (match x)))
 
 (defparser neverp
-  (λ (x _ fail) (fail x)))
+  (λp (x _ fail) (fail x)))
 
 (defparser (mapp fn parser)
   (λp (x match fail)
@@ -262,7 +120,7 @@
         (match x)
         (fail x))))
 
-(begin "preds" 
+(begin 
        (define pairp (predp pair?))
        (define nump (predp number?))
        (define symp (predp symbol?))
@@ -403,6 +261,7 @@
         (->p (predp symbol?) (constp 'foo)))
    'foo 42 'a 1)
 
+  (testp nilp '())
   (testp (listp) '())
   (testp (listp (predp number?)) '(1))
   (testp (listp (predp number?) (predp number?)) '(1 2))
